@@ -1,22 +1,64 @@
 #include "header.h"
 #include <iostream>
-#include <stack>
 #include <cctype>
 #include <limits>
 #include <windows.h>
 
 using namespace std;
 
+
+void initStack(Stack& s) {
+    s.top = -1;
+}
+
+bool isEmpty(const Stack& s) {
+    return s.top == -1;
+}
+
+bool isFull(const Stack& s) {
+    return s.top == MAX_STACK_SIZE - 1;
+}
+
+void push(Stack& s, const string& value) {
+    if (isFull(s)) {
+        cerr << "РћС€РёР±РєР°: РїРµСЂРµРїРѕР»РЅРµРЅРёРµ СЃС‚РµРєР°\n";
+        return;
+    }
+    s.top++;
+    s.data[s.top] = value;
+}
+
+string pop(Stack& s) {
+    if (isEmpty(s)) {
+        cerr << "РћС€РёР±РєР°: СЃС‚РµРє РїСѓСЃС‚\n";
+        return "";
+    }
+    string value = s.data[s.top];
+    s.top--;
+    return value;
+}
+
+string top(const Stack& s) {
+    if (isEmpty(s)) {
+        cerr << "РћС€РёР±РєР°: СЃС‚РµРє РїСѓСЃС‚\n";
+        return "";
+    }
+    return s.data[s.top];
+}
+
+int size(const Stack& s) {
+    return s.top + 1;
+}
+
+
 void setRussianLocale() {
     SetConsoleCP(1251);
     SetConsoleOutputCP(1251);
 }
-// Функция проверки корректности постфиксного выражения
-// Выполняет две проверки: статическую (подсчёт операндов/операторов)
-// и динамическую (проверка возможности вычисления с использованием стека)
+
 bool validatePostfix(const string& expr) {
     if (expr.empty()) {
-        cout << "Ошибка: выражение не может быть пустым\n";
+        cout << "РћС€РёР±РєР°: РІС‹СЂР°Р¶РµРЅРёРµ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹Рј\n";
         return false;
     }
     
@@ -31,34 +73,54 @@ bool validatePostfix(const string& expr) {
             operatorCount++;
         }
         else {
-            cout << "Ошибка: недопустимый символ '" << c << "'\n";
+            cout << "РћС€РёР±РєР°: РЅРµРґРѕРїСѓСЃС‚РёРјС‹Р№ СЃРёРјРІРѕР» '" << c << "'\n";
             return false;
         }
     }
     
+    // РџРµСЂРІС‹Р№ СѓСЂРѕРІРµРЅСЊ РІР°Р»РёРґР°С†РёРё
     if (operandCount != operatorCount + 1) {
-        cout << "Ошибка: некорректное постфиксное выражение\n";
+        cout << "РћС€РёР±РєР°: РЅРµРєРѕСЂСЂРµРєС‚РЅРѕРµ РїРѕСЃС‚С„РёРєСЃРЅРѕРµ РІС‹СЂР°Р¶РµРЅРёРµ\n";
         return false;
+    }
+    
+    // Р’С‚РѕСЂРѕР№ СѓСЂРѕРІРµРЅСЊ РІР°Р»РёРґР°С†РёРё
+    Stack checkStack;
+    initStack(checkStack);
+    
+    for (char c : expr) {
+        if (isalpha(c)) {
+            push(checkStack, "1");
+        }
+        else if (c == '+' || c == '-' || c == '*' || c == '/') {
+            if (size(checkStack) < 2) {
+                cout << "РћС€РёР±РєР°: РЅРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РѕРїРµСЂР°РЅРґРѕРІ РґР»СЏ РѕРїРµСЂР°С†РёРё '" << c << "'\n";
+                return false;
+            }
+            pop(checkStack);
+            pop(checkStack);
+            push(checkStack, "1");
+        }
     }
     
     return true;
 }
-// Функция генерации инструкций для абстрактной ВМ
-// Алгоритм: обход постфиксного выражения, использование стека для хранения операндов,
-// переиспользование временных переменных для экономии памяти
+
 void generateInstructions(const string& postfix) {
-    stack<string> operands;
+    Stack operands;
+    initStack(operands);
+    
     int tempCounter = 1;
     
     for (size_t idx = 0; idx < postfix.length(); idx++) {
         char c = postfix[idx];
         
         if (isalpha(c)) {
-            operands.push(string(1, c));
-        } 
-        else {
-            string right = operands.top(); operands.pop();
-            string left = operands.top(); operands.pop();
+            push(operands, string(1, c));
+        }
+        else if (c == '+' || c == '-' || c == '*' || c == '/') {
+            string right = pop(operands);
+            string left = pop(operands);
             
             cout << "LD " << left << endl;
             switch (c) {
@@ -72,9 +134,10 @@ void generateInstructions(const string& postfix) {
             
             if (!isLastOperation) {
                 string result;
+                
                 if (right[0] == 'T') {
                     result = right;
-                } 
+                }
                 else if (left[0] == 'T') {
                     result = left;
                 }
@@ -82,14 +145,14 @@ void generateInstructions(const string& postfix) {
                     result = "T" + to_string(tempCounter);
                     tempCounter++;
                 }
+                
                 cout << "ST " << result << endl;
-                operands.push(result);
+                push(operands, result);
             }
         }
     }
 }
-// Очистка потока ввода после некорректного ввода
-// Используется при вводе буквы вместо числа в меню
+
 void clearInputStream() {
     cin.clear();
     cin.ignore((numeric_limits<streamsize>::max)(), '\n');
